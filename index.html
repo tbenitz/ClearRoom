@@ -44,6 +44,46 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
 @media(max-width:620px){
  .brand small,.status-pill .status-text{display:none}.topbar{height:62px;padding:0 10px;gap:7px}.shell{min-height:calc(100vh - 62px)}.side{inset:62px 0 70px}.timer-pill{font-size:12px;padding:7px 9px}.video-grid,.video-grid.count-1,.video-grid.count-2,.video-grid.count-3,.video-grid.count-4,.video-grid.count-many{grid-template-columns:1fr;grid-auto-rows:minmax(250px,52vh)}.controls{padding:10px 8px;gap:6px}.controls .iconbtn{height:46px;min-width:46px;padding:0 11px}.control-label{display:none}.card{border-radius:20px}.cardhead{padding:18px 18px 0}.cardhead h1{font-size:28px}.cardbody{padding:16px 18px 18px}.joincols{grid-template-columns:1fr}.previews{grid-template-columns:1fr}.preview{max-height:180px}.quickgrid{grid-template-columns:1fr}.topbar .iconbtn{height:40px;min-width:40px;padding:0 9px}
 }
+
+/* v3 view/layout + clickable host controls */
+.tabs{overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{min-width:62px}
+.view-options{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px}
+.view-option{border:1px solid var(--line);background:#0b1727;color:var(--text);border-radius:14px;padding:12px;text-align:left;min-height:78px}
+.view-option:hover{border-color:#456384}.view-option.active{border-color:var(--brand);background:#10302f;box-shadow:inset 0 0 0 1px rgba(101,227,196,.16)}
+.view-option b{display:block;font-size:13px}.view-option small{display:block;color:var(--muted);font-weight:500;margin-top:4px;line-height:1.3}
+.host-popover{position:fixed;z-index:120;width:240px;background:#0b1726;border:1px solid var(--line);border-radius:17px;padding:7px;box-shadow:var(--shadow)}
+.host-popover .pop-title{padding:8px 10px 7px;color:var(--muted);font-size:12px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.host-popover button{width:100%;border:0;background:transparent;color:var(--text);padding:11px;border-radius:11px;text-align:left;font-weight:800}
+.host-popover button:hover{background:var(--soft)}.host-popover button.danger{color:#ffb2be}.host-popover button.danger:hover{background:#381824}
+.tile{transition:border-color .18s,box-shadow .18s,transform .18s}.tile.speaking{border-color:rgba(101,227,196,.95);box-shadow:0 0 0 3px rgba(101,227,196,.13),0 8px 30px rgba(0,0,0,.18)}
+.tile.is-main{border-color:rgba(84,167,255,.9);box-shadow:0 0 0 3px rgba(84,167,255,.14),0 18px 45px rgba(0,0,0,.28)}
+.tile.is-main.speaking{border-color:var(--brand);box-shadow:0 0 0 4px rgba(101,227,196,.17),0 18px 45px rgba(0,0,0,.30)}
+.tile .mainbadge{position:absolute;top:12px;left:12px;background:rgba(3,9,17,.76);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.09);border-radius:999px;padding:6px 9px;font-size:10px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:#dff7ff}
+.video-grid.layout-fit{height:calc(100vh - 190px);min-height:420px;overflow:hidden;grid-auto-rows:1fr}
+.video-grid.layout-fit .tile{min-height:0}
+.video-grid.layout-large{height:auto;min-height:calc(100vh - 190px);overflow:visible;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(340px,72vh)}
+.video-grid.layout-large.count-1{grid-template-columns:1fr}
+.video-grid.layout-compact{height:calc(100vh - 190px);min-height:420px;overflow:hidden;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));grid-auto-rows:minmax(130px,1fr)}
+.video-grid.layout-speaker{height:calc(100vh - 190px);min-height:440px;overflow:hidden;display:grid;grid-template-columns:minmax(110px,.55fr) repeat(4,minmax(0,1fr)) minmax(110px,.55fr);grid-template-rows:repeat(5,minmax(0,1fr));gap:10px}
+.video-grid.layout-speaker .tile{min-height:0;border-radius:16px}
+.video-grid.layout-speaker .tile.is-main{grid-column:2 / 6;grid-row:1 / 6;border-radius:22px;z-index:2}
+.video-grid.layout-speaker .tile:not(.is-main){min-width:0}
+.speaker-status{display:flex;align-items:center;gap:8px;margin-top:10px;padding:9px 10px;border-radius:12px;background:#091624;border:1px solid rgba(255,255,255,.06);font-size:12px;color:var(--muted)}
+.speaker-status .pulse{width:9px;height:9px;border-radius:50%;background:#607086}.speaker-status.live .pulse{background:var(--brand);box-shadow:0 0 0 5px rgba(101,227,196,.10)}
+@media(max-width:980px){
+ .video-grid.layout-fit,.video-grid.layout-compact,.video-grid.layout-speaker{height:calc(100vh - 175px);min-height:360px}
+ .video-grid.layout-speaker{grid-template-columns:minmax(90px,.5fr) repeat(3,minmax(0,1fr)) minmax(90px,.5fr);grid-template-rows:repeat(5,minmax(0,1fr))}
+ .video-grid.layout-speaker .tile.is-main{grid-column:2 / 5;grid-row:1 / 6}
+}
+@media(max-width:620px){
+ .view-options{grid-template-columns:1fr}
+ .video-grid.layout-fit,.video-grid.layout-compact{height:calc(100vh - 158px);min-height:330px}
+ .video-grid.layout-large{grid-template-columns:1fr;grid-auto-rows:minmax(300px,65vh)}
+ .video-grid.layout-speaker{height:auto;min-height:0;overflow:visible;display:flex;flex-wrap:wrap;align-content:flex-start}
+ .video-grid.layout-speaker .tile.is-main{order:-1;flex:1 0 100%;height:52vh;min-height:320px}
+ .video-grid.layout-speaker .tile:not(.is-main){flex:1 0 calc(50% - 8px);height:150px;min-height:150px}
+}
+
 </style>
 </head>
 <body>
@@ -53,13 +93,14 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
     <div class="spacer"></div>
     <div class="status-pill"><span id="netDot" class="dot"></span><span id="statusText" class="status-text">Not connected</span></div>
     <div id="timerPill" class="timer-pill hidden">⏱ <b id="timerText">--:--</b></div>
+    <button id="viewBtn" class="iconbtn" title="Camera layout">View</button>
     <button id="copyInvite" class="iconbtn hidden" title="Copy invite link">Invite</button>
     <button id="openSide" class="iconbtn mobilebar" title="Open panel">Panel</button>
   </header>
 
   <div class="shell">
     <main class="main">
-      <div id="videoGrid" class="video-grid count-1"></div>
+      <div id="videoGrid" class="video-grid layout-fit count-1"></div>
     </main>
 
     <aside id="side" class="side">
@@ -67,6 +108,7 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
         <button class="tab active" data-tab="people">People</button>
         <button class="tab" data-tab="speak">Speak</button>
         <button class="tab" data-tab="chat">Chat</button>
+        <button class="tab" data-tab="view">View</button>
         <button class="tab" data-tab="more">More</button>
       </div>
 
@@ -119,6 +161,25 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
           <h3>Room chat</h3>
           <div id="chatLog" class="chatlog"><div class="sub">Messages in this room appear here.</div></div>
           <div class="chatcompose"><input id="chatInput" class="chatinput" placeholder="Message everyone…"><button id="chatSend" class="btn primary">Send</button></div>
+        </div>
+      </section>
+
+
+      <section id="viewPane" class="pane">
+        <div class="section">
+          <h3>Camera layout</h3>
+          <div class="sub">This only changes your view. Other people can choose their own layout.</div>
+          <div id="viewOptions" class="view-options">
+            <button class="view-option active" data-layout="fit"><b>Fit everyone</b><small>Default. Keeps all cameras visible on one screen.</small></button>
+            <button class="view-option" data-layout="large"><b>Large tiles</b><small>Bigger camera tiles with scrolling when needed.</small></button>
+            <button class="view-option" data-layout="speaker"><b>Active speaker</b><small>Large center camera automatically follows the current or last speaker.</small></button>
+            <button class="view-option" data-layout="compact"><b>Compact grid</b><small>Smaller tiles to maximize visible participants.</small></button>
+          </div>
+        </div>
+        <div class="section">
+          <div class="switch"><span><b>Follow active speaker</b><div class="sub">When Active speaker view is selected, move the person speaking into the center.</div></span><input id="autoSpeakerToggle" type="checkbox" checked></div>
+          <div class="speaker-status" id="speakerStatus"><span class="pulse"></span><span id="speakerStatusText">Waiting for someone to speak</span></div>
+          <div class="sub" style="margin-top:9px">Tip: in Active speaker view, click any camera to pin it in the middle. Click it again to return to automatic speaker tracking.</div>
         </div>
       </section>
 
@@ -234,6 +295,13 @@ let activeRecorder = null;
 let recordChunks = [];
 let recordKind = '';
 let timerEndsAt = 0;
+let currentLayout = localStorage.getItem('clearroom.layout') || 'fit';
+let autoFollowSpeaker = localStorage.getItem('clearroom.autoSpeaker') !== 'false';
+let activeSpeakerId = '';
+let lastSpeakerId = '';
+let lastSpeakerAt = 0;
+let manualFocusId = '';
+let speakerMonitor = 0;
 let timerTicker = null;
 let roomCreatedAt = Date.now();
 let lastPhrase = '';
@@ -271,7 +339,7 @@ function updateInvite(){
 async function copyInvite(){
   const url=$('#inviteField').value || inviteUrl();
   try{ await navigator.clipboard.writeText(url); toast('Invite link copied'); }
-  catch{ prompt('Copy this invite link:',url); }
+  catch{ const f=$('#inviteField'); f.value=url; f.focus(); f.select(); toast('Invite link selected — copy it from the Room panel'); }
 }
 $('#copyInvite').onclick=copyInvite; $('#copyInvite2').onclick=copyInvite;
 
@@ -353,6 +421,8 @@ async function startPeer(){
     if(isHost) hostId=myId;
     roster.set(myId,{id:myId,name:myName,muted:isMuted(),camera:isCameraOn(),joinedAt:Date.now()});
     addOrUpdateTile(myId, localStream, myName, true);
+    ensureAudioMixer();
+    audioCtx?.resume?.().catch(()=>{});
     renderRoster(); updateInvite(); setStatus('Connected',true);
     bindPeerHandlers();
     if(isHost){
@@ -548,6 +618,12 @@ function addOrUpdateTile(id,stream,name,local=false){
   if(!tile){
     tile=document.createElement('article'); tile.className='tile'; tile.dataset.id=id;
     tile.innerHTML=`<video autoplay playsinline ${local?'muted':''}></video><div class="fallback"><div class="avatar"></div></div><div class="tilemeta"><span class="namechip"></span><span class="hosttag hidden">Host</span><span class="mutetag hidden">Muted</span></div>`;
+    tile.addEventListener('click',e=>{
+      if(currentLayout!=='speaker' || e.target.closest('button')) return;
+      manualFocusId=(manualFocusId===id?'':id);
+      applySpeakerFocus();
+      toast(manualFocusId?'Main camera pinned':'Automatic speaker tracking restored');
+    });
     videoGrid.appendChild(tile);
   }
   const v=tile.querySelector('video'); if(stream && v.srcObject!==stream) v.srcObject=stream;
@@ -568,10 +644,29 @@ function renderTiles(){
     video.style.opacity=p.camera===false && id!==myId ? '.03':'1';
     tile.querySelector('.fallback').style.display=p.camera===false ? 'grid':'none';
   });
+  applySpeakerFocus();
 }
 function updateGrid(){
   const n=videoGrid.children.length;
-  videoGrid.className='video-grid '+(n===1?'count-1':n===2?'count-2':n<=4?'count-4':'count-many');
+  const countClass=n===1?'count-1':n===2?'count-2':n<=4?'count-4':'count-many';
+  videoGrid.className=`video-grid layout-${currentLayout} ${countClass}`;
+  videoGrid.style.gridTemplateColumns=''; videoGrid.style.gridTemplateRows='';
+  if(currentLayout==='fit'){
+    const mobile=innerWidth<=620;
+    let cols;
+    if(mobile) cols=n<=1?1:2;
+    else cols=n<=1?1:n<=4?2:n<=6?3:n<=8?4:5;
+    const rows=Math.max(1,Math.ceil(Math.max(1,n)/cols));
+    videoGrid.style.gridTemplateColumns=`repeat(${cols},minmax(0,1fr))`;
+    videoGrid.style.gridTemplateRows=`repeat(${rows},minmax(0,1fr))`;
+  }
+  applySpeakerFocus();
+}
+function setLayout(layout){
+  if(!['fit','large','speaker','compact'].includes(layout)) layout='fit';
+  currentLayout=layout; localStorage.setItem('clearroom.layout',layout);
+  $$('.view-option').forEach(b=>b.classList.toggle('active',b.dataset.layout===layout));
+  manualFocusId=''; updateGrid();
 }
 function renderRoster(){
   $('#countText').textContent=roster.size;
@@ -582,20 +677,28 @@ function renderRoster(){
     div.querySelector('b').textContent=p.name+(p.id===myId?' (you)':'');
     if(isHost && p.id!==myId){
       const btn=document.createElement('button'); btn.className='more'; btn.textContent='•••'; btn.title='Participant controls';
-      btn.onclick=()=>participantMenu(p); div.appendChild(btn);
+      btn.onclick=e=>{e.stopPropagation();participantMenu(p,btn)}; div.appendChild(btn);
     }
     box.appendChild(div);
   });
 }
-function participantMenu(p){
-  const action=prompt(`Host controls for ${p.name}\nType:\n1 = Make host\n2 = Mute\n3 = Remove`);
-  if(action==='1'){
-    hostId=p.id; isHost=false; broadcast({t:'host_change',hostId:p.id}); refreshHostState();updateInvite();renderRoster();renderTiles();
-  }else if(action==='2'){
-    broadcast({t:'force_mute',target:p.id});
-  }else if(action==='3'){
-    broadcast({t:'kick',target:p.id});
-  }
+function closeHostPopover(){ document.querySelector('.host-popover')?.remove(); }
+function participantMenu(p,anchor){
+  closeHostPopover();
+  const menu=document.createElement('div'); menu.className='host-popover';
+  const r=anchor.getBoundingClientRect();
+  menu.style.left=Math.max(10,Math.min(innerWidth-250,r.right-240))+'px';
+  menu.style.top=Math.max(10,Math.min(innerHeight-235,r.bottom+6))+'px';
+  const title=document.createElement('div'); title.className='pop-title'; title.textContent='Host controls · '+p.name;
+  const host=document.createElement('button'); host.textContent='Make host';
+  host.onclick=()=>{hostId=p.id;isHost=false;broadcast({t:'host_change',hostId:p.id});refreshHostState();updateInvite();renderRoster();renderTiles();closeHostPopover();};
+  const mute=document.createElement('button'); mute.textContent=p.muted?'Ask to unmute':'Mute participant';
+  mute.onclick=()=>{if(p.muted){sendTo(p.id,{t:'chat',from:myId,name:'Host',text:'The host is asking you to unmute your microphone.',ts:Date.now()});toast('Unmute request sent');}else{broadcast({t:'force_mute',target:p.id});toast('Participant muted');}closeHostPopover();};
+  const pin=document.createElement('button'); pin.textContent='Put in main speaker view';
+  pin.onclick=()=>{setLayout('speaker');manualFocusId=p.id;applySpeakerFocus();openTab('view');closeHostPopover();};
+  const remove=document.createElement('button'); remove.className='danger'; remove.textContent='Remove from room';
+  remove.onclick=()=>{if(confirm(`Remove ${p.name} from the room?`))broadcast({t:'kick',target:p.id});closeHostPopover();};
+  menu.append(title,host,mute,pin,remove); document.body.appendChild(menu);
 }
 function refreshHostState(){
   isHost=myId===hostId;
@@ -674,6 +777,13 @@ function openTab(name){
   if(innerWidth<=980) $('#side').classList.add('open');
 }
 $$('.tab').forEach(b=>b.onclick=()=>openTab(b.dataset.tab));
+$$('.view-option').forEach(b=>b.onclick=()=>setLayout(b.dataset.layout));
+$('#autoSpeakerToggle').checked=autoFollowSpeaker;
+$('#autoSpeakerToggle').onchange=()=>{autoFollowSpeaker=$('#autoSpeakerToggle').checked;localStorage.setItem('clearroom.autoSpeaker',String(autoFollowSpeaker));if(autoFollowSpeaker)manualFocusId='';applySpeakerFocus();};
+$('#viewBtn').onclick=()=>openTab('view');
+document.addEventListener('click',e=>{if(!e.target.closest('.host-popover')&&!e.target.closest('.more'))closeHostPopover();});
+addEventListener('resize',()=>updateGrid());
+setLayout(currentLayout);
 $('#openSide').onclick=()=>$('#side').classList.toggle('open');
 $('#speakPanelBtn').onclick=()=>openTab('speak');
 
@@ -711,6 +821,11 @@ function speakToRoom(textOverride=''){
 }
 function receiveTTS(msg,me=false){
   if(!msg.text)return;
+  // Treat AAC/TTS as speaking too, so the typed speaker gets the same visual focus.
+  if(msg.from){
+    activeSpeakerId=msg.from; lastSpeakerId=msg.from; lastSpeakerAt=Date.now(); applySpeakerFocus();
+    setTimeout(()=>{ if(activeSpeakerId===msg.from){activeSpeakerId='';applySpeakerFocus();} }, Math.min(5000,Math.max(1800,msg.text.length*55)));
+  }
   localSpeak(msg.text,msg.rate,msg.pitch,msg.name);
   addChat(msg.name||'Speaker','🔊 '+msg.text,msg.ts,me||msg.from===myId);
 }
@@ -767,13 +882,67 @@ function addAudioToMix(id,stream){
   try{
     const src=audioCtx.createMediaStreamSource(new MediaStream([track]));
     const gain=audioCtx.createGain(); gain.gain.value=1;
+    const analyser=audioCtx.createAnalyser(); analyser.fftSize=512; analyser.smoothingTimeConstant=.72;
+    const meter=new Uint8Array(analyser.fftSize);
     src.connect(gain).connect(audioDest);
-    audioNodes.set(id,{src,gain});
+    src.connect(analyser);
+    audioNodes.set(id,{src,gain,analyser,meter});
+    startSpeakerMonitor();
   }catch(e){console.warn('audio mix',e)}
 }
 function removeAudioFromMix(id){
   const n=audioNodes.get(id); if(!n)return;
-  try{n.src.disconnect();n.gain.disconnect()}catch{} audioNodes.delete(id);
+  try{n.src.disconnect();n.gain.disconnect();n.analyser.disconnect()}catch{} audioNodes.delete(id);
+}
+function startSpeakerMonitor(){
+  if(speakerMonitor) return;
+  speakerMonitor=setInterval(detectActiveSpeaker,180);
+}
+function detectActiveSpeaker(){
+  if(!joined || !audioNodes.size) return;
+  let bestId='', best=0;
+  audioNodes.forEach((n,id)=>{
+    if(roster.get(id)?.muted) return;
+    try{
+      n.analyser.getByteTimeDomainData(n.meter);
+      let sum=0;
+      for(let i=0;i<n.meter.length;i++){ const x=(n.meter[i]-128)/128; sum+=x*x; }
+      const rms=Math.sqrt(sum/n.meter.length);
+      if(rms>best){best=rms;bestId=id;}
+    }catch{}
+  });
+  const now=Date.now();
+  if(bestId && best>.028){
+    activeSpeakerId=bestId; lastSpeakerId=bestId; lastSpeakerAt=now;
+  }else{
+    activeSpeakerId='';
+    if(now-lastSpeakerAt>2800) lastSpeakerId='';
+  }
+  applySpeakerFocus();
+}
+function focusSpeakerId(){
+  if(manualFocusId && roster.has(manualFocusId)) return manualFocusId;
+  if(autoFollowSpeaker) return activeSpeakerId || lastSpeakerId || hostId || myId;
+  return lastSpeakerId || hostId || myId;
+}
+function applySpeakerFocus(){
+  const focus=focusSpeakerId();
+  $$('.tile').forEach(tile=>{
+    const id=tile.dataset.id;
+    tile.classList.toggle('speaking',id===activeSpeakerId);
+    tile.classList.toggle('is-main',currentLayout==='speaker' && id===focus);
+    let badge=tile.querySelector('.mainbadge');
+    if(currentLayout==='speaker' && id===focus){
+      if(!badge){badge=document.createElement('span');badge.className='mainbadge';tile.appendChild(badge);}
+      badge.textContent=manualFocusId?'Pinned':(id===activeSpeakerId?'Speaking':'Main speaker');
+    }else badge?.remove();
+  });
+  const p=roster.get(activeSpeakerId || lastSpeakerId);
+  const status=$('#speakerStatus'), txt=$('#speakerStatusText');
+  if(status&&txt){
+    status.classList.toggle('live',!!activeSpeakerId);
+    txt.textContent=activeSpeakerId ? `${p?.name||'Someone'} is speaking` : (p ? `Last speaker: ${p.name}` : 'Waiting for someone to speak');
+  }
 }
 function bestMime(kind){
   const choices=kind==='audio'
