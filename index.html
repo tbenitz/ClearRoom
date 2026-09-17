@@ -106,12 +106,22 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
  .host-action{flex:1 1 calc(50% - 4px);min-height:38px}
 }
 
+
+.unmute-request-card{width:min(460px,100%);background:linear-gradient(180deg,#12243a,#0a1726);border:1px solid rgba(101,227,196,.34);border-radius:24px;padding:22px;box-shadow:var(--shadow)}
+.unmute-request-icon{width:60px;height:60px;border-radius:20px;display:grid;place-items:center;background:rgba(101,227,196,.12);font-size:30px;margin-bottom:14px}
+.unmute-request-card h2{margin:0 0 7px;font-size:25px;letter-spacing:-.025em}
+.unmute-request-card p{margin:0;color:var(--muted);font-size:14px}
+.unmute-request-actions{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:18px}
+.unmute-request-actions button{min-height:48px}
+.unmute-request-card .host-request-name{color:var(--brand);font-weight:850}
+@media(max-width:520px){.unmute-request-actions{grid-template-columns:1fr}.unmute-request-card{padding:18px}}
+
 </style>
 </head>
 <body>
 <div class="app">
   <header class="topbar">
-    <div class="brand"><div class="logo">C</div><div>ClearRoom <span class="build-badge">V4</span><small>browser meeting room</small></div></div>
+    <div class="brand"><div class="logo">C</div><div>ClearRoom <span class="build-badge">V4.1</span><small>browser meeting room</small></div></div>
     <div class="spacer"></div>
     <div class="status-pill"><span id="netDot" class="dot"></span><span id="statusText" class="status-text">Not connected</span></div>
     <div id="timerPill" class="timer-pill hidden">⏱ <b id="timerText">--:--</b></div>
@@ -246,7 +256,7 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
 <div id="joinOverlay" class="overlay">
   <div class="card">
     <div class="cardhead">
-      <div class="brand"><div class="logo">C</div><div>ClearRoom <span class="build-badge">V4</span></div></div>
+      <div class="brand"><div class="logo">C</div><div>ClearRoom <span class="build-badge">V4.1</span></div></div>
       <h1 id="joinTitle">A calmer video room.</h1>
       <p id="joinSubtitle">Up to 10 people, screen sharing, local recording, host controls, and built-in type-to-speak for AAC/ALS communication.</p>
     </div>
@@ -266,6 +276,19 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
       </div>
       <button id="joinBtn" class="bigbtn">Create room</button>
       <div class="sub" style="margin-top:10px;text-align:center">Camera and microphone permissions stay in your browser. HTTPS is required on GitHub Pages.</div>
+    </div>
+  </div>
+</div>
+
+
+<div id="unmuteOverlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="unmuteRequestTitle">
+  <div class="unmute-request-card">
+    <div class="unmute-request-icon">🎙</div>
+    <h2 id="unmuteRequestTitle">The host is asking you to unmute</h2>
+    <p><span id="unmuteRequestHost" class="host-request-name">The host</span> would like you to turn on your microphone. Your microphone will never be turned on automatically.</p>
+    <div class="unmute-request-actions">
+      <button id="acceptUnmuteBtn" class="btn primary">Unmute now</button>
+      <button id="dismissUnmuteBtn" class="btn">Not now</button>
     </div>
   </div>
 </div>
@@ -348,6 +371,7 @@ let timerTicker = null;
 let roomCreatedAt = Date.now();
 let lastPhrase = '';
 let recentPhrases = JSON.parse(localStorage.getItem('clearroom.recent') || '[]').slice(0,12);
+let activeUnmuteRequest = null;
 let quickPhrases = JSON.parse(localStorage.getItem('clearroom.quick') || 'null') || [
   'Yes.', 'No.', 'Please give me a moment.', 'Could you repeat that?',
   'I have something to add.', 'Thank you.', 'I need a break.', 'Please check the chat.'
@@ -699,7 +723,12 @@ function attachDataConnection(con, priority=false){
   con.on('close',()=>{ if(dataCons.get(pid)===con) dataCons.delete(pid); handlePeerGone(pid); });
   con.on('error',e=>console.warn('data',pid,e));
 }
-function sendTo(pid,msg){ const c=dataCons.get(pid); if(c?.open) try{c.send(msg)}catch{} }
+function sendTo(pid,msg){
+  const c=dataCons.get(pid);
+  if(!c?.open) return false;
+  try{ c.send(msg); return true; }
+  catch(e){ console.warn('sendTo failed',pid,e); return false; }
+}
 function broadcast(msg, except=''){
   dataCons.forEach((c,id)=>{ if(id!==except && c.open) try{c.send(msg)}catch{} });
 }
@@ -774,6 +803,21 @@ function handleData(msg, from, con){
     case 'timer':
       if(!senderIsCurrentHost) return;
       syncTimer(msg.endsAt); break;
+    case 'unmute_request':
+      if(!senderIsCurrentHost || (msg.target && msg.target!==myId)) return;
+      showUnmuteRequest(msg);
+      sendTo(from,{t:'unmute_request_ack',requestId:msg.requestId,from:myId,name:myName,status:'received'});
+      break;
+    case 'unmute_request_ack':
+      if(!isHost) return;
+      if(msg.status==='received') toast(`${safeName(msg.name)} received the unmute request`,3200);
+      break;
+    case 'unmute_request_response':
+      if(!isHost) return;
+      if(msg.status==='unmuted') toast(`${safeName(msg.name)} unmuted`,3200);
+      else if(msg.status==='dismissed') toast(`${safeName(msg.name)} chose not to unmute`,3200);
+      else if(msg.status==='no-mic') toast(`${safeName(msg.name)} could not access a microphone`,3600);
+      break;
     case 'force_mute':
       if(!senderIsCurrentHost) return;
       if(!msg.target || msg.target===myId){ setMic(false,true); toast('The host muted your microphone'); }
@@ -966,13 +1010,22 @@ function makeParticipantHost(p){
   toast(`${p.name} is now the host`);
 }
 function hostMuteAction(p){
-  if(!isHost)return;
+  if(!isHost || !p?.id) return;
   if(p.muted){
-    sendTo(p.id,{t:'chat',from:myId,name:'Host',text:'The host is asking you to unmute your microphone.',ts:Date.now()});
-    toast(`Asked ${p.name} to unmute`);
+    const requestId=`unmute-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const delivered=sendTo(p.id,{
+      t:'unmute_request',
+      target:p.id,
+      requestId,
+      from:myId,
+      hostName:myName,
+      ts:Date.now()
+    });
+    if(delivered) toast(`Unmute request sent to ${p.name}`);
+    else toast(`Could not reach ${p.name}. Their connection may be reconnecting.`,4200);
   }else{
-    sendTo(p.id,{t:'force_mute',target:p.id});
-    toast(`${p.name} muted`);
+    const delivered=sendTo(p.id,{t:'force_mute',target:p.id});
+    toast(delivered ? `${p.name} muted` : `Could not reach ${p.name}`, delivered?2200:3800);
   }
 }
 function hostRemoveAction(p,btn){
@@ -1277,6 +1330,91 @@ $('#recordScreenBtn').onclick=async()=>{
   }catch(e){if(e.name!=='NotAllowedError')toast('Screen recording could not start')}
 };
 
+
+// ----- Host unmute requests -----
+function showUnmuteRequest(msg){
+  activeUnmuteRequest={
+    requestId:msg.requestId || '',
+    hostId:hostId,
+    hostName:safeName(msg.hostName || roster.get(hostId)?.name || 'The host')
+  };
+  $('#unmuteRequestHost').textContent=activeUnmuteRequest.hostName;
+  $('#unmuteOverlay').classList.remove('hidden');
+  toast('Host requested that you unmute',3500);
+  try{ navigator.vibrate?.([120,70,120]); }catch{}
+}
+function closeUnmuteRequest(){
+  $('#unmuteOverlay').classList.add('hidden');
+}
+async function acceptHostUnmuteRequest(){
+  const req=activeUnmuteRequest;
+  if(!req){ closeUnmuteRequest(); return; }
+  try{
+    let audioTrack=localStream?.getAudioTracks?.()[0];
+    if(!audioTrack){
+      const micStream=await navigator.mediaDevices.getUserMedia({
+        audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true},
+        video:false
+      });
+      audioTrack=micStream.getAudioTracks()[0];
+      if(!localStream) localStream=new MediaStream();
+      localStream.addTrack(audioTrack);
+
+      // Replace the silent/missing outbound audio track on all current calls.
+      for(const call of mediaCalls.values()){
+        const pc=call.peerConnection;
+        const sender=pc?.getSenders?.().find(s=>s.track?.kind==='audio');
+        if(sender) await sender.replaceTrack(audioTrack);
+        else if(pc) pc.addTrack(audioTrack,localStream);
+      }
+      addAudioToMix(myId,localStream);
+    }
+    audioTrack.enabled=true;
+    $('#micBtn').classList.add('on');
+    $('#micBtn').classList.remove('danger');
+    $('#micBtn').firstChild.textContent='🎙 ';
+    stateUpdate();
+    sendTo(req.hostId,{
+      t:'unmute_request_response',
+      requestId:req.requestId,
+      from:myId,
+      name:myName,
+      status:'unmuted'
+    });
+    toast('Microphone is on');
+    activeUnmuteRequest=null;
+    closeUnmuteRequest();
+  }catch(e){
+    console.warn('Unable to unmute from request',e);
+    sendTo(req.hostId,{
+      t:'unmute_request_response',
+      requestId:req.requestId,
+      from:myId,
+      name:myName,
+      status:'no-mic'
+    });
+    toast('Microphone permission was not granted',4200);
+    activeUnmuteRequest=null;
+    closeUnmuteRequest();
+  }
+}
+function dismissHostUnmuteRequest(){
+  const req=activeUnmuteRequest;
+  if(req){
+    sendTo(req.hostId,{
+      t:'unmute_request_response',
+      requestId:req.requestId,
+      from:myId,
+      name:myName,
+      status:'dismissed'
+    });
+  }
+  activeUnmuteRequest=null;
+  closeUnmuteRequest();
+}
+$('#acceptUnmuteBtn').onclick=acceptHostUnmuteRequest;
+$('#dismissUnmuteBtn').onclick=dismissHostUnmuteRequest;
+
 // ----- Name / leave -----
 $('#renameBtn').onclick=()=>{
   myName=safeName($('#renameField').value);localStorage.setItem('clearroom.name',myName);
@@ -1299,7 +1437,7 @@ addEventListener('beforeunload',()=>{try{anchorPeer?.destroy()}catch{};try{peer?
 
 // More UI
 $('#speakPanelBtn').onclick=()=>openTab('speak');
-$('#connectionInfo').textContent='ClearRoom v4: stable room rendezvous + WebRTC mesh. Media is sent directly between participants where network conditions allow.';
+$('#connectionInfo').textContent='ClearRoom v4.1: stable room rendezvous + WebRTC mesh. Media is sent directly between participants where network conditions allow.';
 
 })();
 </script>
