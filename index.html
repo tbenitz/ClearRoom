@@ -4,7 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#07111f">
-<title>ClearRoom — private browser video rooms</title>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
+<title>ClearRoom v4 — private browser video rooms</title>
 <meta name="description" content="A lightweight browser video room with host controls, recording, screen sharing and ALS-friendly room TTS.">
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js"></script>
 <style>
@@ -84,12 +87,31 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
  .video-grid.layout-speaker .tile:not(.is-main){flex:1 0 calc(50% - 8px);height:150px;min-height:150px}
 }
 
+
+.build-badge{display:inline-flex;align-items:center;margin-left:7px;padding:2px 6px;border-radius:999px;background:rgba(101,227,196,.12);border:1px solid rgba(101,227,196,.25);color:var(--brand);font-size:9px;font-weight:900;letter-spacing:.08em;vertical-align:middle}
+.person{flex-wrap:wrap}
+.person-main{display:flex;align-items:center;gap:10px;width:100%}
+.host-actions{width:100%;display:flex;flex-wrap:wrap;gap:6px;padding:6px 0 3px 46px}
+.host-action{border:1px solid var(--line);background:#101e31;color:#dce9f8;border-radius:10px;padding:7px 9px;font-size:11px;font-weight:800}
+.host-action:hover{border-color:#4c6688;background:#15283f}
+.host-action.host{color:#b9f8e7}.host-action.main{color:#bcdcff}.host-action.danger{color:#ffb8c2;border-color:#542438;background:#26131d}
+.host-action.confirm{background:#64243a;color:#fff;border-color:#9c3652}
+.join-state{margin-bottom:12px;padding:11px 12px;border-radius:14px;border:1px solid var(--line);background:#0a1727;display:flex;gap:10px;align-items:center}
+.join-state .join-copy{flex:1;min-width:0}.join-state b{display:block;font-size:12px}.join-state span{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.join-state.good{border-color:rgba(101,227,196,.28);background:rgba(101,227,196,.06)}
+.join-state.warn{border-color:rgba(255,204,102,.30);background:rgba(255,204,102,.06)}
+.join-state .mini{border:1px solid var(--line);background:var(--soft);color:var(--text);border-radius:9px;padding:7px 9px;font-size:11px;font-weight:800}
+@media(max-width:620px){
+ .host-actions{padding-left:0}
+ .host-action{flex:1 1 calc(50% - 4px);min-height:38px}
+}
+
 </style>
 </head>
 <body>
 <div class="app">
   <header class="topbar">
-    <div class="brand"><div class="logo">C</div><div>ClearRoom<small>browser meeting room</small></div></div>
+    <div class="brand"><div class="logo">C</div><div>ClearRoom <span class="build-badge">V4</span><small>browser meeting room</small></div></div>
     <div class="spacer"></div>
     <div class="status-pill"><span id="netDot" class="dot"></span><span id="statusText" class="status-text">Not connected</span></div>
     <div id="timerPill" class="timer-pill hidden">⏱ <b id="timerText">--:--</b></div>
@@ -113,6 +135,10 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
       </div>
 
       <section id="peoplePane" class="pane active">
+        <div id="roomJoinState" class="join-state hidden">
+          <div class="join-copy"><b id="roomJoinTitle">Finding room…</b><span id="roomJoinDetail">Connecting to the meeting host.</span></div>
+          <button id="retryRoomBtn" class="mini hidden">Retry now</button>
+        </div>
         <div class="section">
           <div class="row"><div><h3 style="margin:0">Participants</h3><div class="sub"><span id="countText">0</span> / 10 in room</div></div><div class="spacer"></div><span id="hostBadge" class="hosttag hidden">Host</span></div>
           <div id="peopleList" style="margin-top:8px"></div>
@@ -220,7 +246,7 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
 <div id="joinOverlay" class="overlay">
   <div class="card">
     <div class="cardhead">
-      <div class="brand"><div class="logo">C</div><div>ClearRoom</div></div>
+      <div class="brand"><div class="logo">C</div><div>ClearRoom <span class="build-badge">V4</span></div></div>
       <h1 id="joinTitle">A calmer video room.</h1>
       <p id="joinSubtitle">Up to 10 people, screen sharing, local recording, host controls, and built-in type-to-speak for AAC/ALS communication.</p>
     </div>
@@ -251,8 +277,9 @@ kbd{background:#1c2b41;border:1px solid #31435e;border-bottom-width:2px;border-r
 'use strict';
 
 /* -------------------------------------------------------
-   ClearRoom
+   ClearRoom v4
    Static WebRTC room for GitHub Pages.
+   Stable room rendezvous prevents refresh/rejoin split rooms.
    PeerJS Cloud is used only for signaling by default.
    For production, point Peer() to your own PeerServer and
    add TURN credentials below.
@@ -273,11 +300,26 @@ const RTC_CONFIG = {
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 const qs = new URLSearchParams(location.search);
+const requestedRoomKey=(qs.get('room')||'').replace(/[^a-zA-Z0-9_-]/g,'').slice(0,64);
+function makeRoomKey(){
+  const bytes=new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+let roomKey=requestedRoomKey || makeRoomKey();
+const hostStorageKey=()=>`clearroom.v4.host.${roomKey}`;
+const anchorId=()=>`clearroom-v4-${roomKey}`;
 
 let peer = null;
+let anchorPeer = null;
+let anchorLookup = null;
+let anchorRetryTimer = 0;
+let anchorLookupTimeout = 0;
+let anchorClaimAttempt = 0;
 let myId = '';
-let hostId = qs.get('room') || '';
-let isHost = !hostId;
+let hostId = '';
+let isHost = !requestedRoomKey || localStorage.getItem(hostStorageKey())==='1';
+let restoringHost = !!requestedRoomKey && isHost;
 let locked = false;
 let joined = false;
 let myName = localStorage.getItem('clearroom.name') || '';
@@ -324,17 +366,26 @@ function toast(msg, ms=2200){
 function safeName(v){ return (v || 'Guest').replace(/[<>]/g,'').trim().slice(0,40) || 'Guest'; }
 function initials(name){ return safeName(name).split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase(); }
 function fmtTime(ts){ return new Date(ts).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}); }
-function inviteUrl(id=hostId || myId){
+function inviteUrl(){
   const u = new URL(location.href);
   u.search = '';
-  u.searchParams.set('room', id);
+  u.searchParams.set('room', roomKey);
+  u.searchParams.set('v','4');
   return u.toString();
 }
 function setStatus(text, live=false){ statusText.textContent=text; netDot.classList.toggle('live',live); }
+function setRoomJoinState(kind,title,detail,retry=false){
+  const box=$('#roomJoinState'); if(!box)return;
+  box.classList.remove('hidden','good','warn');
+  if(kind) box.classList.add(kind);
+  $('#roomJoinTitle').textContent=title;
+  $('#roomJoinDetail').textContent=detail;
+  $('#retryRoomBtn').classList.toggle('hidden',!retry);
+}
 function updateInvite(){
-  const url = inviteUrl(isHost ? myId : hostId);
+  const url = inviteUrl();
   $('#inviteField').value=url;
-  $('#copyInvite').classList.toggle('hidden',!joined);
+  $('#copyInvite').classList.toggle('hidden',!myId);
 }
 async function copyInvite(){
   const url=$('#inviteField').value || inviteUrl();
@@ -345,11 +396,15 @@ $('#copyInvite').onclick=copyInvite; $('#copyInvite2').onclick=copyInvite;
 
 async function preparePreview(){
   $('#nameInput').value=myName;
-  if(hostId){
+  if(requestedRoomKey && !isHost){
     $('#joinTitle').textContent='Join the room';
     $('#joinSubtitle').textContent='Check your camera and microphone, then join the meeting.';
     $('#joinBtn').textContent='Join room';
     $('#hostSetup').classList.add('hidden');
+  }else if(requestedRoomKey && isHost){
+    $('#joinTitle').textContent='Reopen your room';
+    $('#joinSubtitle').textContent='This browser previously hosted this room. Reopen it with the same invite link.';
+    $('#joinBtn').textContent='Reopen room';
   }
   if(!navigator.mediaDevices?.getUserMedia){
     toast('Camera/microphone access is not supported in this browser.');
@@ -416,35 +471,48 @@ $('#joinBtn').onclick = async () => {
 
 async function startPeer(){
   peer = new Peer(undefined, RTC_CONFIG);
+  bindPeerHandlers();
   peer.on('open', id => {
-    myId=id; joined=true; roomCreatedAt=Date.now();
-    if(isHost) hostId=myId;
+    myId=id; roomCreatedAt=Date.now();
     roster.set(myId,{id:myId,name:myName,muted:isMuted(),camera:isCameraOn(),joinedAt:Date.now()});
     addOrUpdateTile(myId, localStream, myName, true);
     ensureAudioMixer();
     audioCtx?.resume?.().catch(()=>{});
-    renderRoster(); updateInvite(); setStatus('Connected',true);
-    bindPeerHandlers();
+    renderRoster(); updateInvite();
+
     if(isHost){
-      $('#hostBadge').classList.remove('hidden');
-      $('#hostTools').classList.remove('hidden');
+      hostId=myId;
+      joined=true;
+      localStorage.setItem(hostStorageKey(),'1');
+      refreshHostState();
+      setStatus('Opening room…');
+      setRoomJoinState('warn','Opening room…','Claiming this room’s stable meeting address.');
       locked=false;
-      startTimer(Number($('#preDuration').value || 60), true);
-      broadcastRoster();
+      startTimer(Number($('#preDuration').value || 60), false);
+      if(restoringHost) probeRoomBeforeRestore();
+      else claimRoomAnchor();
     }else{
-      connectData(hostId, true);
-      callPeer(hostId);
+      setStatus('Finding host…');
+      setRoomJoinState('warn','Finding host…','Looking up the current host for this room.',true);
+      findHostViaAnchor(true);
     }
   });
   peer.on('error', err => {
     console.error(err);
-    if(err.type==='peer-unavailable' && !isHost){
-      setStatus('Room unavailable');
-      toast('The room host could not be reached.');
-    }else toast('Connection issue: '+(err.type||err.message));
+    if(!isHost && err.type==='peer-unavailable'){
+      setStatus('Host offline — retrying…');
+      setRoomJoinState('warn','Host offline — retrying','This room is not becoming a separate one-person room. ClearRoom will keep checking for the host.',true);
+      scheduleAnchorLookup(1300);
+      return;
+    }
+    toast('Connection issue: '+(err.type||err.message));
   });
-  peer.on('disconnected',()=>setStatus('Reconnecting…'));
+  peer.on('disconnected',()=>{
+    setStatus('Signaling reconnecting…');
+    try{peer.reconnect()}catch{}
+  });
 }
+
 function bindPeerHandlers(){
   peer.on('connection', con => attachDataConnection(con));
   peer.on('call', call => {
@@ -453,6 +521,150 @@ function bindPeerHandlers(){
     attachMediaCall(call);
   });
 }
+
+function probeRoomBeforeRestore(){
+  // A refreshed former host waits briefly before reclaiming the room.
+  // This lets remaining participants elect a successor and prevents split rooms.
+  setStatus('Checking live room…');
+  setRoomJoinState('warn','Checking live room…','Looking for participants who may have kept this room alive after the host refreshed.',false);
+  const started=Date.now();
+  let finished=false;
+  const attempt=()=>{
+    if(finished || !peer?.open) return;
+    let con;
+    try{con=peer.connect(anchorId(),{reliable:true,metadata:{role:'restore-probe',roomKey}})}
+    catch{ return again(); }
+    let got=false;
+    const timer=setTimeout(()=>{try{con.close()}catch{}; if(!got)again();},1100);
+    con.on('open',()=>{try{con.send({t:'lookup',roomKey,from:myId})}catch{}});
+    con.on('data',msg=>{
+      if(msg?.t!=='room_info' || msg.roomKey!==roomKey) return;
+      got=true; finished=true; clearTimeout(timer);
+      try{con.close()}catch{}
+      // Someone else kept or inherited the room. Rejoin them rather than opening a duplicate.
+      isHost=false; restoringHost=false; joined=false;
+      localStorage.removeItem(hostStorageKey());
+      hostId=msg.hostId||'';
+      refreshHostState();
+      setStatus('Rejoining live room…');
+      setRoomJoinState('warn','Live room found','Rejoining the current host instead of creating a duplicate room.',false);
+      if(hostId){connectData(hostId,true);callPeer(hostId)}
+      else findHostViaAnchor(true);
+    });
+    con.on('error',()=>{clearTimeout(timer);if(!got)again()});
+  };
+  const again=()=>{
+    if(finished)return;
+    if(Date.now()-started>=5200){
+      finished=true; restoringHost=false;
+      setStatus('Restoring room…');
+      setRoomJoinState('warn','Restoring your room','No live successor was found, so this browser is reopening the stable room address.',false);
+      claimRoomAnchor();
+      return;
+    }
+    setTimeout(attempt,500);
+  };
+  attempt();
+}
+
+function claimRoomAnchor(){
+  if(!isHost || !myId) return;
+  clearTimeout(anchorRetryTimer);
+  try{anchorPeer?.destroy()}catch{}
+  const ap=new Peer(anchorId(), RTC_CONFIG);
+  anchorPeer=ap;
+  ap.on('open',()=>{
+    if(anchorPeer!==ap || !isHost) return;
+    anchorClaimAttempt=0;
+    joined=true;
+    hostId=myId;
+    localStorage.setItem(hostStorageKey(),'1');
+    setStatus('Hosting room',true);
+    setRoomJoinState('good','Room is live','Guests using this invite link will find this host automatically.');
+    $('#connectionInfo').textContent=`Room ${roomKey.slice(0,8)}… is live. Stable rendezvous active.`;
+    broadcastRoster();
+  });
+  ap.on('connection',con=>{
+    con.on('open',()=>{
+      try{con.send({t:'room_info',roomKey,hostId:myId,locked,full:roster.size>=MAX_PEOPLE,ts:Date.now()})}catch{}
+    });
+    con.on('data',msg=>{
+      if(msg?.t==='lookup'){
+        try{con.send({t:'room_info',roomKey,hostId:myId,locked,full:roster.size>=MAX_PEOPLE,ts:Date.now()})}catch{}
+      }
+    });
+  });
+  ap.on('error',err=>{
+    console.warn('room anchor',err);
+    if(anchorPeer!==ap || !isHost) return;
+    if(err.type==='unavailable-id'){
+      anchorClaimAttempt++;
+      if(anchorClaimAttempt<=4){
+        setStatus('Restoring room…');
+        setRoomJoinState('warn','Restoring room…',`The old room address is still releasing. Retry ${anchorClaimAttempt}/4.`,false);
+        anchorRetryTimer=setTimeout(claimRoomAnchor,1200*anchorClaimAttempt);
+      }else{
+        // Another live host now owns the stable room address. Join that host instead of splitting the room.
+        try{ap.destroy()}catch{}
+        if(anchorPeer===ap)anchorPeer=null;
+        isHost=false; joined=false; hostId='';
+        localStorage.removeItem(hostStorageKey());
+        refreshHostState();
+        setStatus('Joining current host…');
+        setRoomJoinState('warn','Another host is active','Joining the live room instead of creating a duplicate.',true);
+        findHostViaAnchor(true);
+      }
+    }
+  });
+}
+
+function releaseRoomAnchor(){
+  clearTimeout(anchorRetryTimer);
+  anchorClaimAttempt=0;
+  if(anchorPeer){try{anchorPeer.destroy()}catch{} anchorPeer=null;}
+}
+
+function scheduleAnchorLookup(delay=1600){
+  if(isHost || !peer?.open) return;
+  clearTimeout(anchorRetryTimer);
+  anchorRetryTimer=setTimeout(()=>findHostViaAnchor(false),delay);
+}
+function findHostViaAnchor(immediate=false){
+  if(isHost || !peer?.open) return;
+  clearTimeout(anchorRetryTimer); clearTimeout(anchorLookupTimeout);
+  try{anchorLookup?.close()}catch{}
+  setStatus('Finding host…');
+  const con=peer.connect(anchorId(),{reliable:true,metadata:{role:'room-lookup',roomKey}});
+  anchorLookup=con;
+  let resolved=false;
+  const retry=()=>{
+    if(resolved || isHost) return;
+    resolved=true;
+    try{con.close()}catch{}
+    setStatus('Host offline — retrying…');
+    setRoomJoinState('warn','Host offline — retrying','Waiting for the current host to reopen or reconnect. You have not been placed in a different room.',true);
+    scheduleAnchorLookup(immediate?900:1800);
+  };
+  anchorLookupTimeout=setTimeout(retry,3500);
+  con.on('open',()=>{try{con.send({t:'lookup',roomKey,from:myId})}catch{}});
+  con.on('data',msg=>{
+    if(msg?.t!=='room_info' || msg.roomKey!==roomKey) return;
+    resolved=true; clearTimeout(anchorLookupTimeout);
+    hostId=msg.hostId||'';
+    try{con.close()}catch{}
+    if(!hostId){scheduleAnchorLookup(1200);return}
+    setStatus('Joining room…');
+    setRoomJoinState('warn','Host found','Connecting your audio, video, and room data now.',false);
+    connectData(hostId,true);
+    callPeer(hostId);
+  });
+  con.on('close',()=>{if(!resolved)retry()});
+  con.on('error',retry);
+}
+$('#retryRoomBtn').onclick=()=>{
+  if(isHost) claimRoomAnchor();
+  else findHostViaAnchor(true);
+};
 
 function connectData(pid, priority=false){
   if(!pid || pid===myId || dataCons.has(pid)) return;
@@ -467,6 +679,12 @@ function attachDataConnection(con, priority=false){
   if(existing && existing.open) { try{con.close()}catch{}; return; }
   dataCons.set(pid,con);
   con.on('open',()=>{
+    if(!isHost && pid===hostId){
+      joined=true;
+      setStatus('Connected',true);
+      setRoomJoinState('good','Connected to room','You are in the same live room as the host.');
+      $('#connectionInfo').textContent=`Connected to room ${roomKey.slice(0,8)}…`;
+    }
     con.send({t:'hello',id:myId,name:myName,muted:isMuted(),camera:isCameraOn(),joinedAt:Date.now()});
     if(isHost) {
       if(roster.size>=MAX_PEOPLE && !roster.has(pid)){
@@ -491,6 +709,7 @@ function routeRoomMessage(msg){
 }
 function handleData(msg, from, con){
   if(!msg || typeof msg!=='object') return;
+  const senderIsCurrentHost=(from===hostId);
   switch(msg.t){
     case 'hello': {
       const person={id:from,name:safeName(msg.name),muted:!!msg.muted,camera:!!msg.camera,joinedAt:msg.joinedAt||Date.now()};
@@ -506,6 +725,9 @@ function handleData(msg, from, con){
     }
     case 'roster': {
       if(!Array.isArray(msg.people)) return;
+      if(!isHost && from!==hostId) return;
+      joined=true; setStatus('Connected',true);
+      setRoomJoinState('good','Connected to room','Roster synchronized with the current host.');
       roster.clear();
       msg.people.forEach(p=>roster.set(p.id,p));
       if(!roster.has(myId)) roster.set(myId,{id:myId,name:myName,muted:isMuted(),camera:isCameraOn(),joinedAt:Date.now()});
@@ -526,25 +748,42 @@ function handleData(msg, from, con){
       break;
     case 'chat': addChat(msg.name,msg.text,msg.ts,msg.from===myId); break;
     case 'tts': receiveTTS(msg); break;
-    case 'host_change':
+    case 'host_change': {
+      // Normal transfer must come from the current host. After a crashed host,
+      // the deterministic elected successor may announce itself.
+      const oldHostStillPresent=roster.has(hostId);
+      const crashSuccession=(!oldHostStillPresent && msg.hostId===from);
+      if(!senderIsCurrentHost && !crashSuccession) return;
+      const wasHost=isHost;
       hostId=msg.hostId;
       isHost=(myId===hostId);
+      if(wasHost && !isHost){ localStorage.removeItem(hostStorageKey()); releaseRoomAnchor(); }
+      if(isHost){
+        localStorage.setItem(hostStorageKey(),'1');
+        claimRoomAnchor();
+      }
       refreshHostState(); updateInvite(); renderRoster(); renderTiles();
       if(isHost){ broadcastRoster(); toast('You are now the host'); }
       else toast((roster.get(hostId)?.name||'A participant')+' is now host');
       break;
+    }
     case 'lock':
+      if(!senderIsCurrentHost) return;
       locked=!!msg.locked; if(!isHost) toast(locked?'Room locked by host':'Room unlocked');
       break;
     case 'timer':
+      if(!senderIsCurrentHost) return;
       syncTimer(msg.endsAt); break;
     case 'force_mute':
+      if(!senderIsCurrentHost) return;
       if(!msg.target || msg.target===myId){ setMic(false,true); toast('The host muted your microphone'); }
       break;
     case 'kick':
+      if(!senderIsCurrentHost) return;
       if(msg.target===myId){ toast('The host removed you from the room'); setTimeout(leaveRoom,900); }
       break;
     case 'meeting_end':
+      if(!senderIsCurrentHost) return;
       toast('The scheduled meeting time has ended.',5000); break;
     case 'reject':
       toast(msg.reason||'Unable to join this room',5000); setTimeout(leaveRoom,1200); break;
@@ -553,7 +792,7 @@ function handleData(msg, from, con){
 
 function broadcastRoster(){
   if(!isHost) return;
-  const msg={t:'roster',people:[...roster.values()],hostId:myId,locked,timerEndsAt};
+  const msg={t:'roster',people:[...roster.values()],hostId,locked,timerEndsAt};
   broadcast(msg);
 }
 function stateUpdate(){
@@ -564,7 +803,7 @@ function stateUpdate(){
   renderRoster(); renderTiles();
 }
 function handlePeerGone(pid){
-  // Delay so temporary reconnects do not immediately alter roster.
+  // Delay so a short reconnect does not immediately reshuffle the room.
   setTimeout(()=>{
     const hasData=dataCons.get(pid)?.open;
     const hasMedia=mediaCalls.has(pid);
@@ -576,13 +815,26 @@ function handlePeerGone(pid){
       const candidates=[...roster.values()].sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0)||a.id.localeCompare(b.id));
       const next=candidates[0]?.id;
       if(next){
-        hostId=next; isHost=(next===myId);
-        broadcast({t:'host_change',hostId:next});
-        refreshHostState(); updateInvite();
-        if(isHost) broadcastRoster();
+        hostId=next;
+        isHost=(next===myId);
+        if(isHost){
+          localStorage.setItem(hostStorageKey(),'1');
+          refreshHostState();
+          claimRoomAnchor();
+          broadcast({t:'host_change',hostId:next});
+          setTimeout(broadcastRoster,250);
+          toast('Host disconnected — you are the new host');
+        }else{
+          refreshHostState();
+          setStatus('Host reconnecting…');
+        }
+        updateInvite(); renderRoster(); renderTiles();
+      }else{
+        joined=false;
+        setStatus('Waiting for host…');
       }
     }
-  },1200);
+  },1400);
 }
 
 function callPeer(pid){
@@ -673,35 +925,76 @@ function renderRoster(){
   const box=$('#peopleList'); box.innerHTML='';
   [...roster.values()].sort((a,b)=>(a.id===hostId?-1:b.id===hostId?1:(a.joinedAt||0)-(b.joinedAt||0))).forEach(p=>{
     const div=document.createElement('div'); div.className='person';
-    div.innerHTML=`<div class="pavatar">${initials(p.name)}</div><div class="who"><b></b><small>${p.id===hostId?'Host · ':''}${p.muted?'Muted':'Microphone on'}</small></div>`;
-    div.querySelector('b').textContent=p.name+(p.id===myId?' (you)':'');
+    const main=document.createElement('div'); main.className='person-main';
+    main.innerHTML=`<div class="pavatar">${initials(p.name)}</div><div class="who"><b></b><small>${p.id===hostId?'Host · ':''}${p.muted?'Muted':'Microphone on'}</small></div>`;
+    main.querySelector('b').textContent=p.name+(p.id===myId?' (you)':'');
+    div.appendChild(main);
+
     if(isHost && p.id!==myId){
-      const btn=document.createElement('button'); btn.className='more'; btn.textContent='•••'; btn.title='Participant controls';
-      btn.onclick=e=>{e.stopPropagation();participantMenu(p,btn)}; div.appendChild(btn);
+      const actions=document.createElement('div'); actions.className='host-actions';
+
+      const hostBtn=document.createElement('button');
+      hostBtn.className='host-action host'; hostBtn.textContent='Make host';
+      hostBtn.onclick=()=>makeParticipantHost(p);
+
+      const muteBtn=document.createElement('button');
+      muteBtn.className='host-action'; muteBtn.textContent=p.muted?'Ask to unmute':'Mute';
+      muteBtn.onclick=()=>hostMuteAction(p);
+
+      const mainBtn=document.createElement('button');
+      mainBtn.className='host-action main'; mainBtn.textContent='Main view';
+      mainBtn.onclick=()=>{setLayout('speaker');manualFocusId=p.id;applySpeakerFocus();openTab('view');toast(`${p.name} pinned in your main view`);};
+
+      const removeBtn=document.createElement('button');
+      removeBtn.className='host-action danger'; removeBtn.textContent='Remove';
+      removeBtn.onclick=()=>hostRemoveAction(p,removeBtn);
+
+      actions.append(hostBtn,muteBtn,mainBtn,removeBtn);
+      div.appendChild(actions);
     }
     box.appendChild(div);
   });
 }
-function closeHostPopover(){ document.querySelector('.host-popover')?.remove(); }
-function participantMenu(p,anchor){
-  closeHostPopover();
-  const menu=document.createElement('div'); menu.className='host-popover';
-  const r=anchor.getBoundingClientRect();
-  menu.style.left=Math.max(10,Math.min(innerWidth-250,r.right-240))+'px';
-  menu.style.top=Math.max(10,Math.min(innerHeight-235,r.bottom+6))+'px';
-  const title=document.createElement('div'); title.className='pop-title'; title.textContent='Host controls · '+p.name;
-  const host=document.createElement('button'); host.textContent='Make host';
-  host.onclick=()=>{hostId=p.id;isHost=false;broadcast({t:'host_change',hostId:p.id});refreshHostState();updateInvite();renderRoster();renderTiles();closeHostPopover();};
-  const mute=document.createElement('button'); mute.textContent=p.muted?'Ask to unmute':'Mute participant';
-  mute.onclick=()=>{if(p.muted){sendTo(p.id,{t:'chat',from:myId,name:'Host',text:'The host is asking you to unmute your microphone.',ts:Date.now()});toast('Unmute request sent');}else{broadcast({t:'force_mute',target:p.id});toast('Participant muted');}closeHostPopover();};
-  const pin=document.createElement('button'); pin.textContent='Put in main speaker view';
-  pin.onclick=()=>{setLayout('speaker');manualFocusId=p.id;applySpeakerFocus();openTab('view');closeHostPopover();};
-  const remove=document.createElement('button'); remove.className='danger'; remove.textContent='Remove from room';
-  remove.onclick=()=>{if(confirm(`Remove ${p.name} from the room?`))broadcast({t:'kick',target:p.id});closeHostPopover();};
-  menu.append(title,host,mute,pin,remove); document.body.appendChild(menu);
+function makeParticipantHost(p){
+  if(!isHost || !p?.id) return;
+  const oldHost=myId;
+  broadcast({t:'host_change',hostId:p.id});
+  hostId=p.id; isHost=false;
+  localStorage.removeItem(hostStorageKey());
+  releaseRoomAnchor();
+  refreshHostState(); updateInvite(); renderRoster(); renderTiles();
+  toast(`${p.name} is now the host`);
+}
+function hostMuteAction(p){
+  if(!isHost)return;
+  if(p.muted){
+    sendTo(p.id,{t:'chat',from:myId,name:'Host',text:'The host is asking you to unmute your microphone.',ts:Date.now()});
+    toast(`Asked ${p.name} to unmute`);
+  }else{
+    sendTo(p.id,{t:'force_mute',target:p.id});
+    toast(`${p.name} muted`);
+  }
+}
+function hostRemoveAction(p,btn){
+  if(!isHost)return;
+  if(btn.dataset.confirm!=='yes'){
+    btn.dataset.confirm='yes';
+    btn.textContent='Confirm remove';
+    btn.classList.add('confirm');
+    clearTimeout(btn._confirmTimer);
+    btn._confirmTimer=setTimeout(()=>{
+      btn.dataset.confirm='';
+      btn.textContent='Remove';
+      btn.classList.remove('confirm');
+    },3500);
+    return;
+  }
+  sendTo(p.id,{t:'kick',target:p.id});
+  btn.disabled=true; btn.textContent='Removing…';
+  setTimeout(()=>{dataCons.get(p.id)?.close(); mediaCalls.get(p.id)?.close(); handlePeerGone(p.id)},450);
 }
 function refreshHostState(){
-  isHost=myId===hostId;
+  if(hostId) isHost=myId===hostId;
   $('#hostBadge').classList.toggle('hidden',!isHost);
   $('#hostTools').classList.toggle('hidden',!isHost);
 }
@@ -781,7 +1074,6 @@ $$('.view-option').forEach(b=>b.onclick=()=>setLayout(b.dataset.layout));
 $('#autoSpeakerToggle').checked=autoFollowSpeaker;
 $('#autoSpeakerToggle').onchange=()=>{autoFollowSpeaker=$('#autoSpeakerToggle').checked;localStorage.setItem('clearroom.autoSpeaker',String(autoFollowSpeaker));if(autoFollowSpeaker)manualFocusId='';applySpeakerFocus();};
 $('#viewBtn').onclick=()=>openTab('view');
-document.addEventListener('click',e=>{if(!e.target.closest('.host-popover')&&!e.target.closest('.more'))closeHostPopover();});
 addEventListener('resize',()=>updateGrid());
 setLayout(currentLayout);
 $('#openSide').onclick=()=>$('#side').classList.toggle('open');
@@ -995,15 +1287,19 @@ function leaveRoom(){
   try{localStream?.getTracks().forEach(t=>t.stop())}catch{}
   for(const c of dataCons.values())try{c.close()}catch{}
   for(const c of mediaCalls.values())try{c.close()}catch{}
+  releaseRoomAnchor();
+  try{anchorLookup?.close()}catch{}
   try{peer?.destroy()}catch{}
-  joined=false; location.href=location.pathname;
+  joined=false;
+  // A host keeps the recovery marker so reopening the same invite on this browser can restore the room.
+  location.href=location.pathname;
 }
 $('#hangBtn').onclick=leaveRoom;
-addEventListener('beforeunload',()=>{try{peer?.destroy()}catch{}});
+addEventListener('beforeunload',()=>{try{anchorPeer?.destroy()}catch{};try{peer?.destroy()}catch{}});
 
 // More UI
 $('#speakPanelBtn').onclick=()=>openTab('speak');
-$('#connectionInfo').textContent='WebRTC mesh: media is sent directly between participants where network conditions allow.';
+$('#connectionInfo').textContent='ClearRoom v4: stable room rendezvous + WebRTC mesh. Media is sent directly between participants where network conditions allow.';
 
 })();
 </script>
